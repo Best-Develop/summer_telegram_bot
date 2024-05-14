@@ -245,7 +245,7 @@ class SummerActionBotHandler extends WebhookHandler
         $sequence = SummerActionGiftPlayer::where('summer_action_gift_id', $gift['id'])->count();
         switch ($gift['photo_name']) {
             case 'Evos.png':
-                $spreadsheet = IOFactory::load(Storage::path('public/EVOS.csv'));
+                $spreadsheet = IOFactory::load('EVOS.csv');
                 $sheetData = $spreadsheet->getActiveSheet()->toArray(null, true, true, true);
                 $code = $sheetData[$sequence + 1]["A"];
                 break;
