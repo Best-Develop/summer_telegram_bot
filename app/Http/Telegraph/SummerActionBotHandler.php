@@ -69,7 +69,7 @@ class SummerActionBotHandler extends WebhookHandler
         $client = Client::findByPhoneNumber($phoneNumber)->first();
         $clientId = $phoneNumber
             ? $client?->id
-            : SummerActionGiftUser::where('profile_id', $message['chat']['id'])->first()->client_id;
+            : SummerActionGiftUser::where('profile_id', $message['chat']['id'])->first()?->client_id;
         $myContracts = Contract::with('product_deliveries')->select('id', 'organization_id')
             ->whereDoesntHave('summer_action_gift_player')
             ->whereHas('product_deliveries', function ($query) {
