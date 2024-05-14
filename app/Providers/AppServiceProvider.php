@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Interfaces\SummerActionGiftInterface;
+use App\Repositories\SummerActionGiftRepository;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
