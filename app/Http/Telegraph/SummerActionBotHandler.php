@@ -71,6 +71,8 @@ class SummerActionBotHandler extends WebhookHandler
             ? $client?->id
             : SummerActionGiftUser::where('profile_id', $message['chat']['id'])->first()?->client_id;
         $myContracts = Contract::with('product_deliveries')->select('id', 'organization_id')
+            ->whereDate('date', '>=', Contract::BEGIN_DATE)
+            ->whereDate('date', '<=', Contract::END_DATE)
             ->whereDoesntHave('summer_action_gift_player')
             ->whereHas('product_deliveries', function ($query) {
                 $query->where('status', '!=', ProductDelivery::STATUS_DELETED);
@@ -169,6 +171,8 @@ class SummerActionBotHandler extends WebhookHandler
             $organizationName = $organization->organization;
             $winner = $this->saveGift($gift, $contract);
             $myContracts = Contract::with('product_deliveries:id,contract_id,status')
+                ->whereDate('date', '>=', Contract::BEGIN_DATE)
+                ->whereDate('date', '<=', Contract::END_DATE)
                 ->whereDoesntHave('summer_action_gift_player')
                 ->whereHas('product_deliveries', function ($query) {
                     $query->where('status', '!=', ProductDelivery::STATUS_DELETED);
