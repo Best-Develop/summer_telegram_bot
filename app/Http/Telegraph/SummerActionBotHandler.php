@@ -133,7 +133,6 @@ class SummerActionBotHandler extends WebhookHandler
                     $query->whereIn('client_id', $registeredClientIds);
                 })
                 ->orderBy('id')
-                ->select("id", "date", "client_id", "closed", "organization_id")
                 ->get();
 
             if (count($myGifts) != 0) {
