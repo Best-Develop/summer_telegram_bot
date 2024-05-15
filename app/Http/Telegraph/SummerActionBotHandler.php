@@ -125,7 +125,7 @@ class SummerActionBotHandler extends WebhookHandler
                         ->photo(public_path($photo))
                         ->send();
                     if (file_exists($photo) && $code == '') {
-                        unlink($photo);
+                        // unlink($photo);
                     }
                 }
             } else {
