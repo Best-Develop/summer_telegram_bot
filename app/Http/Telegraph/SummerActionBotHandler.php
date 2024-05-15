@@ -64,7 +64,7 @@ class SummerActionBotHandler extends WebhookHandler
                 ->where("inps", "!=", NULL)
                 ->whereRaw('LENGTH(inps) = 14')
                 ->where("main_phone_number", "!=", NULL)
-                ->where("id", )
+                ->where("id", $clientId)
                 ->orderBy("id", "DESC")
                 ->first();
             });
