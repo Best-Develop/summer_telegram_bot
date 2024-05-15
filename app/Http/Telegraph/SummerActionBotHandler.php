@@ -20,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use DefStudio\Telegraph\Keyboard\ReplyButton;
 use DefStudio\Telegraph\Keyboard\ReplyKeyboard;
 use DefStudio\Telegraph\Handlers\WebhookHandler;
+use Illuminate\Support\Facades\Cache;
 
 class SummerActionBotHandler extends WebhookHandler
 {
@@ -42,7 +43,12 @@ class SummerActionBotHandler extends WebhookHandler
                 ($data['from']['first_name'] . ' ' . $data['from']['last_name']) == ' ' ? 'mijoz' : $data['from']['first_name'] . ' ' . $data['from']['last_name'])
                 . ".\r\nIshonchli mijoz aksiyasi telegram botiga xush kelibsiz."
         );
-        $profile = SummerActionGiftUser::where('profile_id', $data['from']['id'])->first();
+        $fromId =  $data['from']['id'];
+
+        $profile = Cache::remember("profile_".$fromId, 300, function() use($fromId){
+            return SummerActionGiftUser::where('profile_id', $fromId)->first();
+        });
+
         if (!$profile) {
             $this->chat->message('Telefon raqamingizni yuboring')
                 ->replyKeyboard(ReplyKeyboard::make()
@@ -52,13 +58,16 @@ class SummerActionBotHandler extends WebhookHandler
                     ->oneTime())
                 ->send();
         } else {
-            $client = Client::select('id', 'fio')
+            $clientId = $profile['client_id'];
+            $client = Cache::remember("cached_client_".$clientId, 300, function() use($clientId){
+                return Client::select('id', 'fio')
                 ->where("inps", "!=", NULL)
                 ->whereRaw('LENGTH(inps) = 14')
                 ->where("main_phone_number", "!=", NULL)
-                ->where("id", $profile['client_id'])
+                ->where("id", )
                 ->orderBy("id", "DESC")
                 ->first();
+            });
             $this->chat->markdown("*Ro'yxatdan o'tgan mijoz:* \n" . $client['fio'])
                 ->replyKeyboard(ReplyKeyboard::make()->buttons([
                     ReplyButton::make('🪪 Shartnoma raqamini yuborish 🪪'),
@@ -70,23 +79,34 @@ class SummerActionBotHandler extends WebhookHandler
     public function handleChatMessage(\Illuminate\Support\Stringable $text): void
     {
         $message = $this->message->toArray();
-        Log::info(json_encode($message));
+        // Log::info(json_encode($message));
         $phoneNumber = isset($message['contact']['phone_number']) ? $message['contact']['phone_number'] : null;
-        $client = Client::findByPhoneNumber($phoneNumber)->first();
+        $client = Cache::remember("client_id_".$phoneNumber, 300, function() use($phoneNumber){
+            return Client::findByPhoneNumber($phoneNumber)->first();
+        });
+
+        $_chatId = $message['chat']['id'];
+        $summerActionGiftUserClient = Cache::remember("summer_action_gift_user_".$message['chat']['id'], 300, function() use($_chatId){
+            return SummerActionGiftUser::where('profile_id', $_chatId)->first();
+        });
+
         $clientId = $phoneNumber
             ? $client?->id
-            : SummerActionGiftUser::where('profile_id', $message['chat']['id'])->first()?->client_id;
+            : $summerActionGiftUserClient?->client_id;
 
         $registeredClientIds = $this->getClientIds($clientId);
-        $myContracts = Contract::with('product_deliveries')->select('id', 'organization_id')
+        $myContracts = Contract::with([
+            'product_deliveries' => fn ($query) => $query->select("id", "contract_id", "status")
+        ])
             ->whereDate('date', '>=', Contract::BEGIN_DATE)
             ->whereDate('date', '<=', Contract::END_DATE)
             ->whereDoesntHave('summer_action_gift_player')
             ->whereHas('product_deliveries', function ($query) {
-                $query->where('status', '!=', ProductDelivery::STATUS_DELETED);
+                $query->where('status', '!=', ProductDelivery::STATUS_DELETED)->select("id", "contract_id", "status");
             })
             ->whereIn('client_id', $registeredClientIds)
             ->where('product_price', '>=', 4000000)
+            ->select("id", "date", "client_id", "closed", "organization_id")
             ->get();
 
         if ($message['text'] == '' && $phoneNumber) {
@@ -113,6 +133,7 @@ class SummerActionBotHandler extends WebhookHandler
                     $query->whereIn('client_id', $registeredClientIds);
                 })
                 ->orderBy('id')
+                ->select("id", "date", "client_id", "closed", "organization_id")
                 ->get();
 
             if (count($myGifts) != 0) {
@@ -171,11 +192,18 @@ class SummerActionBotHandler extends WebhookHandler
                 ->send();
             $organizationId = collect($myContracts)->where('id', str_replace(['+', '-'], '', filter_var($message['text'], FILTER_SANITIZE_NUMBER_INT)))->first()['organization_id'];
             $contractId = explode("-", $message['text'])[0];
-            $organization = Organization::find($organizationId);
-            $contract = Contract::find($contractId);
+            $organization = Cache::remember("organization_id_".$organizationId, 300, function()use($organizationId){
+                return Organization::find($organizationId);
+            });
+            $contract = Cache::remember("contract_".$contractId, 300, function() use($contractId){
+                return Contract::find($contractId);
+            });
             $giftOrganizations = $this->getOrganizationGift($organizationId);
             $prize = $giftOrganizations->random();
-            $gift = SummerActionGift::find($prize['summer_action_gift_id']);
+            $giftSummerId = $prize['summer_action_gift_id'];
+            $gift = Cache::remember("summer_action_gift_".$giftSummerId, 300, function() use($giftSummerId){
+                return SummerActionGift::find($giftSummerId);
+            });
             $prizeName = $prize['name'];
             $organizationName = $organization->organization;
             $winner = $this->saveGift($gift, $contract);
@@ -190,6 +218,7 @@ class SummerActionBotHandler extends WebhookHandler
                 ->select('id', 'organization_id')
                 ->whereIn('client_id', $registeredClientIds)
                 ->where('product_price', '>=', 4000000)
+                ->select("id", "date", "client_id", "closed", "organization_id")
                 ->get();
             $this->chat->html("<b>Yutuq: $prizeName (" . $winner['generated_code'] . " )\nSovg'a yutilgan sana: "
                 . $winner['created_at']->format('Y-m-d H:i:s') . " \nFilial: ✅ " . $organizationName . " ✅\nShartnoma ID: $contractId</b>")
@@ -215,11 +244,21 @@ class SummerActionBotHandler extends WebhookHandler
         }
     }
 
+    public function checkPhoneNumberExists($phoneNumber)
+    {
+        return Cache::remember("checkPhoneNumberExists_" . $phoneNumber, 300, function ()use($phoneNumber) {
+            return SummerActionGiftUser::where('phone_number', $phoneNumber)->exists();
+        });
+    }
+
     public function getOrganizationGift($organizationId)
     {
-        $organizationGifts = SummerActionGiftOrganization::with('summer_action_gift')
-            ->where('organization_id', $organizationId)
-            ->get();
+        $organizationGifts = Cache::remember("getOrganizationGift_" . $organizationId, 600, function ()use($organizationId) {
+            return SummerActionGiftOrganization::with('summer_action_gift')
+                ->where('organization_id', $organizationId)
+                ->get();
+        });
+
         $data = [];
         foreach ($organizationGifts as $organizationGift) {
 
@@ -302,7 +341,9 @@ class SummerActionBotHandler extends WebhookHandler
     // clientId orqali shu inps ga tegishli barcha mijozlar ID larini olish
     public function getClientIds($clientId)
     {
-        $registeredClient = Client::where("id", $clientId)->first();
-        return Client::where("inps", $registeredClient?->inps)->pluck("id")->toArray();
+       return  Cache::remember("getClientIds_" . $clientId, 300, function ()use($clientId) {
+            $registeredClient = Client::where("id", $clientId)->first();
+            return Client::where("inps", $registeredClient?->inps)->pluck("id")->toArray();
+        });
     }
 }
