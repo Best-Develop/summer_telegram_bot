@@ -22,6 +22,10 @@ class Client extends Model
         $formattedPhoneNumber = '+' . substr($phoneNumber, 0, 3) . ' (' . substr($phoneNumber, 3, 2) . ') ' . substr($phoneNumber, 5, 3) . '-' . substr($phoneNumber, 8, 2) . '-' . substr($phoneNumber, 10);
 
         return $query->where('main_phone_number', $formattedPhoneNumber)
-            ->orWhere('main_phone_number', '+' . $phoneNumber);
+            ->where("inps", "!=", NULL)
+            ->whereRaw('LENGTH(inps) = 14')
+            ->where("main_phone_number", "!=", NULL)
+            ->orWhere('main_phone_number', '+' . $phoneNumber)
+            ->orderBy("id", "DESC");
     }
 }
