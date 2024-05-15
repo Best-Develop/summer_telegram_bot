@@ -40,7 +40,7 @@ class SummerActionBotHandler extends WebhookHandler
         $this->reply(
             'Assalom alekum xurmatli ' . (
                 ($data['from']['first_name'] . ' ' . $data['from']['last_name']) == ' ' ? 'mijoz' : $data['from']['first_name'] . ' ' . $data['from']['last_name'])
-                . ".\r\nYozgi sovg'alar aksiyasi telegram botiga xush kelibsiz."
+                . ".\r\nIshonchli mijoz aksiyasi telegram botiga xush kelibsiz."
         );
         $profile = SummerActionGiftUser::where('profile_id', $data['from']['id'])->first();
         if (!$profile) {
