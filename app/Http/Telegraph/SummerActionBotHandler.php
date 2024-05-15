@@ -342,6 +342,10 @@ class SummerActionBotHandler extends WebhookHandler
     {
        return  Cache::remember("getClientIds_" . $clientId, 300, function ()use($clientId) {
             $registeredClient = Client::where("id", $clientId)->first();
+            if(is_null($registeredClient)){
+                return [];
+            }
+            
             return Client::where("inps", $registeredClient?->inps)->pluck("id")->toArray();
         });
     }
