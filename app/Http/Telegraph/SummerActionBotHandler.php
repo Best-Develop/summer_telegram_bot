@@ -45,7 +45,7 @@ class SummerActionBotHandler extends WebhookHandler
         );
         $fromId =  $data['from']['id'];
 
-        $profile = Cache::remember("profile_".$fromId, 300, function() use($fromId){
+        $profile = Cache::remember("profile_" . $fromId, 300, function () use ($fromId) {
             return SummerActionGiftUser::where('profile_id', $fromId)->first();
         });
 
@@ -59,14 +59,14 @@ class SummerActionBotHandler extends WebhookHandler
                 ->send();
         } else {
             $clientId = $profile['client_id'];
-            $client = Cache::remember("cached_client_".$clientId, 300, function() use($clientId){
+            $client = Cache::remember("cached_client_" . $clientId, 300, function () use ($clientId) {
                 return Client::select('id', 'fio')
-                ->where("inps", "!=", NULL)
-                ->whereRaw('LENGTH(inps) = 14')
-                ->where("main_phone_number", "!=", NULL)
-                ->where("id", $clientId)
-                ->orderBy("id", "DESC")
-                ->first();
+                    ->where("inps", "!=", NULL)
+                    ->whereRaw('LENGTH(inps) = 14')
+                    ->where("main_phone_number", "!=", NULL)
+                    ->where("id", $clientId)
+                    ->orderBy("id", "DESC")
+                    ->first();
             });
             $this->chat->markdown("*Ro'yxatdan o'tgan mijoz:* \n" . $client['fio'])
                 ->replyKeyboard(ReplyKeyboard::make()->buttons([
@@ -81,12 +81,17 @@ class SummerActionBotHandler extends WebhookHandler
         $message = $this->message->toArray();
         // Log::info(json_encode($message));
         $phoneNumber = isset($message['contact']['phone_number']) ? $message['contact']['phone_number'] : null;
-        $client = Cache::remember("client_id_".$phoneNumber, 300, function() use($phoneNumber){
-            return Client::findByPhoneNumber($phoneNumber)->first();
+        $client = Cache::remember("client_id_" . $phoneNumber, 300, function () use ($phoneNumber) {
+            return Client::select(['id', 'fio'])->whereRaw("regexp_replace(main_phone_number, '[^0-9]', '', 'g') LIKE ?", [$phoneNumber])
+                ->whereActive(true)
+                ->whereNotNull('province_id')
+                ->whereNotNull('region_id')
+                ->whereNotNull('village_id')
+                ->first();
         });
 
         $_chatId = $message['chat']['id'];
-        $summerActionGiftUserClient = Cache::remember("summer_action_gift_user_".$message['chat']['id'], 300, function() use($_chatId){
+        $summerActionGiftUserClient = Cache::remember("summer_action_gift_user_" . $message['chat']['id'], 300, function () use ($_chatId) {
             return SummerActionGiftUser::where('profile_id', $_chatId)->first();
         });
 
@@ -191,16 +196,16 @@ class SummerActionBotHandler extends WebhookHandler
                 ->send();
             $organizationId = collect($myContracts)->where('id', str_replace(['+', '-'], '', filter_var($message['text'], FILTER_SANITIZE_NUMBER_INT)))->first()['organization_id'];
             $contractId = explode("-", $message['text'])[0];
-            $organization = Cache::remember("organization_id_".$organizationId, 300, function()use($organizationId){
+            $organization = Cache::remember("organization_id_" . $organizationId, 300, function () use ($organizationId) {
                 return Organization::find($organizationId);
             });
-            $contract = Cache::remember("contract_".$contractId, 300, function() use($contractId){
+            $contract = Cache::remember("contract_" . $contractId, 300, function () use ($contractId) {
                 return Contract::find($contractId);
             });
             $giftOrganizations = $this->getOrganizationGift($organizationId);
             $prize = $giftOrganizations->random();
             $giftSummerId = $prize['summer_action_gift_id'];
-            $gift = Cache::remember("summer_action_gift_".$giftSummerId, 300, function() use($giftSummerId){
+            $gift = Cache::remember("summer_action_gift_" . $giftSummerId, 300, function () use ($giftSummerId) {
                 return SummerActionGift::find($giftSummerId);
             });
             $prizeName = $prize['name'];
@@ -245,14 +250,14 @@ class SummerActionBotHandler extends WebhookHandler
 
     public function checkPhoneNumberExists($phoneNumber)
     {
-        return Cache::remember("checkPhoneNumberExists_" . $phoneNumber, 300, function ()use($phoneNumber) {
+        return Cache::remember("checkPhoneNumberExists_" . $phoneNumber, 300, function () use ($phoneNumber) {
             return SummerActionGiftUser::where('phone_number', $phoneNumber)->exists();
         });
     }
 
     public function getOrganizationGift($organizationId)
     {
-        $organizationGifts = Cache::remember("getOrganizationGift_" . $organizationId, 600, function ()use($organizationId) {
+        $organizationGifts = Cache::remember("getOrganizationGift_" . $organizationId, 600, function () use ($organizationId) {
             return SummerActionGiftOrganization::with('summer_action_gift')
                 ->where('organization_id', $organizationId)
                 ->get();
@@ -340,12 +345,12 @@ class SummerActionBotHandler extends WebhookHandler
     // clientId orqali shu inps ga tegishli barcha mijozlar ID larini olish
     public function getClientIds($clientId)
     {
-       return  Cache::remember("getClientIds_" . $clientId, 300, function ()use($clientId) {
+        return  Cache::remember("getClientIds_" . $clientId, 300, function () use ($clientId) {
             $registeredClient = Client::where("id", $clientId)->first();
-            if(is_null($registeredClient)){
+            if (is_null($registeredClient)) {
                 return [];
             }
-            
+
             return Client::where("inps", $registeredClient?->inps)->pluck("id")->toArray();
         });
     }
